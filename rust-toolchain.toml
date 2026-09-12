@@ -3,5 +3,5 @@
 # Nixpacks installs this via rustup, which avoids the rust-overlay version-table
 # lookup that fails for bare versions like "1.80". Use a full stable version.
 [toolchain]
-channel = "1.82.0"
+channel = "1.98.1"
 profile = "minimal"

@@ -1,6 +1,6 @@
 # ---- Build stage ------------------------------------------------------------
 # Compile a fully static binary against musl so the runtime image needs no libc.
-FROM rust:1.82-alpine AS builder
+FROM rust:1.98-alpine AS builder
 
 # musl-dev provides the musl libc headers needed to link statically.
 RUN apk add --no-cache musl-dev
