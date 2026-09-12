@@ -24,7 +24,7 @@ use uuid::Uuid;
 use crate::{db, AppState};
 
 /// Session key under which we store the logged-in user's id.
-const USER_ID_KEY: &str = "user_id";
+pub(crate) const USER_ID_KEY: &str = "user_id";
 
 /// Login/signup form payload.
 #[derive(Debug, Deserialize)]
@@ -184,7 +184,7 @@ async fn start_session(session: &Session, user_id: Uuid) -> Result<(), AuthError
 }
 
 /// Minimal HTML escaping for user-controlled text rendered into a page.
-fn html_escape(input: &str) -> String {
+pub(crate) fn html_escape(input: &str) -> String {
     input
         .replace('&', "&amp;")
         .replace('<', "&lt;")

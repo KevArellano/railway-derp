@@ -1,12 +1,15 @@
 use std::net::SocketAddr;
 
 use axum::{
+    extract::State,
     http::StatusCode,
     response::Html,
     routing::{get, post},
     Router,
 };
 use sqlx::PgPool;
+use tower_sessions::Session;
+use uuid::Uuid;
 use tokio::net::TcpListener;
 use tower_http::trace::TraceLayer;
 use tower_sessions::{cookie::SameSite, Expiry, SessionManagerLayer};
@@ -99,9 +102,43 @@ fn build_router(
         .with_state(state)
 }
 
-/// Serve the landing page.
-async fn index() -> Html<&'static str> {
-    Html(INDEX_HTML)
+/// Serve the landing page, rendering a header that reflects auth state.
+///
+/// When logged in, the top-right shows the user's email and a logout button;
+/// otherwise it shows Log in / Sign up links. This is plain server-side
+/// rendering — the header fragment is spliced into the page at `<!--HEADER-->`.
+async fn index(State(state): State<AppState>, session: Session) -> Html<String> {
+    let header = render_header(&state, &session).await;
+    Html(INDEX_HTML.replacen("<!--HEADER-->", &header, 1))
+}
+
+/// Build the top-right header fragment based on the current session.
+async fn render_header(state: &AppState, session: &Session) -> String {
+    // Read the logged-in user id from the session, if any.
+    let user_id: Option<Uuid> = session.get(auth::USER_ID_KEY).await.ok().flatten();
+
+    // Resolve the email only when a session id is present. Any failure (DB
+    // error, or a stale id whose user no longer exists) degrades gracefully to
+    // the logged-out view rather than breaking the landing page.
+    let email = match user_id {
+        Some(id) => db::find_user_by_id(&state.pool, id)
+            .await
+            .ok()
+            .flatten()
+            .map(|u| u.email),
+        None => None,
+    };
+
+    match email {
+        Some(email) => format!(
+            "<span class=\"email\">{}</span>\
+             <form method=\"post\" action=\"/logout\"><button>Log out</button></form>",
+            auth::html_escape(&email)
+        ),
+        None => {
+            "<a href=\"/login\">Log in</a><a href=\"/signup\">Sign up</a>".to_string()
+        }
+    }
 }
 
 /// Health check endpoint — handy for Railway and uptime monitors.
