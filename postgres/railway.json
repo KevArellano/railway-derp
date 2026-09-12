@@ -1,0 +1,10 @@
+{
+  "build": {
+    "builder": "DOCKERFILE",
+    "dockerfilePath": "postgres/Dockerfile"
+  },
+  "deploy": {
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 10
+  }
+}

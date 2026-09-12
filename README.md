@@ -80,16 +80,48 @@ All queries use `sqlx::query` / `query_as` (runtime API), **not** the `sqlx::que
 
 ## Deploy to Railway
 
-Railway builds from the `Dockerfile` (multi-stage static musl → `scratch`).
+This repo deploys **two services** from a single GitHub repo, each with its own Dockerfile:
+
+| Service   | Config              | Dockerfile           | Purpose                    |
+|-----------|---------------------|----------------------|----------------------------|
+| app       | `railway.json`      | `Dockerfile`         | Rust app (static musl → scratch) |
+| postgres  | `postgres/railway.json` | `postgres/Dockerfile` | Self-managed Postgres 18-alpine |
+
+### 1. Postgres service (self-managed)
 
 1. Push this repo to GitHub.
-2. In Railway, create a new project → **Deploy from GitHub repo** → select this repo.
-3. Add a **Postgres** service to the project (New → Database → PostgreSQL).
-4. On the app service, set the `DATABASE_URL` variable to the reference `${{Postgres.DATABASE_URL}}` so it resolves over Railway's private network.
-5. Railway injects `PORT` automatically; the server reads it on startup.
-6. Under the app service **Settings → Networking**, generate a domain for a public URL.
+2. In Railway, create the project and add a service → **Deploy from GitHub repo** → select this repo.
+3. In that service's **Settings**, set the **config path** to `postgres/railway.json` (so it builds `postgres/Dockerfile`).
+4. Add a **Volume** to the service, mounted at `/var/lib/postgresql`. This is required — without it the database is wiped on every redeploy. (Postgres 18+ manages a version-specific data subdirectory inside this mount; do not mount at `/var/lib/postgresql/data`, which is the old ≤17 layout.)
+5. Set variables on the Postgres service:
+   - `POSTGRES_PASSWORD` — a strong password
+   - `POSTGRES_USER` — e.g. `postgres`
+   - `POSTGRES_DB` — e.g. `railway_derp`
 
-Every push to the connected branch triggers a new build and deploy.
+> **Tradeoff:** this is a self-managed database — no automatic backups or managed upgrades. Railway's managed Postgres plugin provides those; this Dockerfile approach trades them for full in-repo version control.
+
+### 2. App service
+
+1. Add a second service from the same repo; leave its config path as the root `railway.json` (builds the root `Dockerfile`).
+2. Set the `DATABASE_URL` variable to reference the Postgres service over the private network, e.g.:
+   ```
+   DATABASE_URL=postgresql://${{postgres.POSTGRES_USER}}:${{postgres.POSTGRES_PASSWORD}}@${{postgres.RAILWAY_PRIVATE_DOMAIN}}:5432/${{postgres.POSTGRES_DB}}
+   ```
+   (Use the actual name of your Postgres service in place of `postgres`.)
+3. Railway injects `PORT` automatically; the server reads it on startup and creates its tables on first boot.
+4. Under the app service **Settings → Networking**, generate a domain for a public URL.
+
+Every push to the connected branch triggers a new build and deploy for both services.
+
+### Local development
+
+For a one-command local stack (app + Postgres 18-alpine), use the included `docker-compose.yml`:
+
+```bash
+docker compose up --build
+```
+
+This is for local dev only — Railway uses the two-service setup above, not compose.
 
 ## Configuration
 

@@ -1,0 +1,50 @@
+# Local development stack: the app + Postgres.
+#
+# Postgres uses the Alpine variant of the latest major (18) for the smallest
+# footprint (~110 MB vs ~400+ MB for the Debian-based default). This mirrors
+# the Railway setup where a managed Postgres provides DATABASE_URL.
+#
+# Usage:
+#   docker compose up --build
+# Then open http://localhost:3000
+
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: dev
+      POSTGRES_DB: railway_derp
+    ports:
+      - "5432:5432"
+    volumes:
+      # Postgres 18+ expects a single mount at /var/lib/postgresql; it manages
+      # a version-specific data subdirectory inside it.
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      # Only mark healthy once Postgres actually accepts connections, so the
+      # app doesn't start querying before the DB is ready.
+      test: ["CMD-SHELL", "pg_isready -U postgres -d railway_derp"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      # Talk to the db service over the compose network.
+      DATABASE_URL: postgres://postgres:dev@db:5432/railway_derp
+      PORT: "3000"
+      # Local stack is plain HTTP, so the session cookie must not be Secure-only.
+      COOKIE_SECURE: "false"
+      RUST_LOG: info,tower_http=info
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
