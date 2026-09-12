@@ -1,0 +1,13 @@
+# Rust build artifacts
+/target
+
+# Environment files (never commit secrets — DB URLs, session keys, etc.)
+.env
+.env.*
+!.env.example
+
+# Editor / OS noise
+.DS_Store
+*.swp
+.idea/
+.vscode/
