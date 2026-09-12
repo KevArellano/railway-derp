@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard · railway-derp</title>
+    <style>
+        :root { color-scheme: light dark; --fg:#1a1a1a; --bg:#fafafa; --muted:#6b7280; --accent:#6366f1; --border:#d1d5db; --card:#fff; }
+        @media (prefers-color-scheme: dark) { :root { --fg:#e5e7eb; --bg:#0f0f11; --muted:#9ca3af; --border:#374151; --card:#17171b; } }
+        * { box-sizing: border-box; }
+        body { margin:0; min-height:100vh; font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; color:var(--fg); background:var(--bg); }
+        header { display:flex; justify-content:space-between; align-items:center; padding:0.85rem 1.5rem; border-bottom:1px solid var(--border); }
+        header a { color:var(--accent); text-decoration:none; font-weight:600; }
+        header .home { color:var(--fg); font-weight:700; letter-spacing:-0.02em; }
+        main { max-width:60rem; margin:0 auto; padding:2rem 1.5rem; }
+        h1 { font-size:1.5rem; margin:0 0 1.5rem; }
+        .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); gap:1rem; }
+        .card { position:relative; }
+        .thumb { display:flex; flex-direction:column; align-items:center; gap:0.6rem; padding:1.1rem; border:1px solid var(--border); border-radius:0.9rem; background:var(--card); text-decoration:none; color:var(--fg); transition:transform .08s ease, box-shadow .08s ease; }
+        .thumb:hover { transform:translateY(-2px); box-shadow:0 6px 18px rgba(0,0,0,0.12); }
+        .tile { display:grid; place-items:center; width:56px; height:56px; border-radius:0.75rem; color:#fff; font-size:1.6rem; font-weight:700; }
+        .name { font-size:0.9rem; font-weight:600; text-align:center; word-break:break-word; }
+        .del { position:absolute; top:-8px; right:-8px; margin:0; }
+        .del button { width:24px; height:24px; border-radius:999px; border:1px solid var(--border); background:var(--card); color:var(--muted); cursor:pointer; line-height:1; font-size:1rem; }
+        .del button:hover { color:#ef4444; border-color:#ef4444; }
+        .empty { color:var(--muted); }
+        form.add { display:flex; flex-wrap:wrap; gap:0.6rem; margin:0 0 2rem; }
+        form.add input { flex:1; min-width:12rem; padding:0.55rem 0.7rem; border:1px solid var(--border); border-radius:0.5rem; background:transparent; color:var(--fg); font-size:0.95rem; }
+        form.add button { padding:0.55rem 1rem; border:0; border-radius:0.5rem; background:var(--accent); color:#fff; font-weight:600; cursor:pointer; }
+    </style>
+</head>
+<body>
+    <header>
+        <a class="home" href="/">railway-derp</a>
+        <form method="post" action="/logout" style="margin:0"><button style="border:1px solid var(--border);background:transparent;color:var(--fg);border-radius:0.5rem;padding:0.35rem 0.7rem;cursor:pointer;">Log out</button></form>
+    </header>
+    <main>
+        <h1>Your apps</h1>
+        <!--ADDFORM-->
+        <div class="grid">
+            <!--THUMBNAILS-->
+        </div>
+    </main>
+</body>
+</html>

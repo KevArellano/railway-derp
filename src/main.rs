@@ -16,6 +16,8 @@ use tower_sessions::{cookie::SameSite, Expiry, SessionManagerLayer};
 use tower_sessions_sqlx_store::PostgresStore;
 
 mod auth;
+mod authz;
+mod dashboard;
 mod db;
 
 /// Shared application state handed to every handler.
@@ -97,6 +99,10 @@ fn build_router(
         .route("/login", get(auth::login_form).post(auth::login))
         .route("/logout", post(auth::logout))
         .route("/me", get(auth::me)) // protected: 401 unless logged in
+        // Dashboard (RBAC-gated)
+        .route("/dashboard", get(dashboard::dashboard))
+        .route("/dashboard/apps", post(dashboard::add_client))
+        .route("/dashboard/apps/{id}/delete", post(dashboard::delete_client))
         .layer(session_layer)
         .layer(TraceLayer::new_for_http())
         .with_state(state)
@@ -131,7 +137,8 @@ async fn render_header(state: &AppState, session: &Session) -> String {
 
     match email {
         Some(email) => format!(
-            "<span class=\"email\">{}</span>\
+            "<a href=\"/dashboard\">Dashboard</a>\
+             <span class=\"email\">{}</span>\
              <form method=\"post\" action=\"/logout\"><button>Log out</button></form>",
             auth::html_escape(&email)
         ),

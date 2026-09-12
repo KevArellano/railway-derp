@@ -21,7 +21,7 @@ use serde::Deserialize;
 use tower_sessions::Session;
 use uuid::Uuid;
 
-use crate::{db, AppState};
+use crate::{authz, db, AppState};
 
 /// Session key under which we store the logged-in user's id.
 pub(crate) const USER_ID_KEY: &str = "user_id";
@@ -71,7 +71,8 @@ pub async fn signup(
         Err(e) => return Err(AuthError::from(e)),
     };
 
-    start_session(&session, user.id).await?;
+    grant_roles(&state, &user).await?;
+    start_session(&state, &session, user.id).await?;
     Ok(Redirect::to("/"))
 }
 
@@ -98,11 +99,40 @@ pub async fn login(
 
     match (user, verified) {
         (Some(u), true) => {
-            start_session(&session, u.id).await?;
+            // Re-apply role grants on each login so ADMIN_EMAILS changes take
+            // effect, and permissions get re-resolved into the fresh session.
+            grant_roles(&state, &u).await?;
+            start_session(&state, &session, u.id).await?;
             Ok(Redirect::to("/"))
         }
         _ => Err(AuthError::InvalidCredentials),
     }
+}
+
+/// Grant roles to a user based on policy.
+///
+/// - Every user gets the `viewer` role (baseline `client:read`).
+/// - Users whose email is listed in the `ADMIN_EMAILS` env var (comma-separated)
+///   additionally get the `admin` role. This solves the bootstrapping problem:
+///   there is no admin until one is configured, and it works cleanly on Railway.
+async fn grant_roles(state: &AppState, user: &db::User) -> Result<(), AuthError> {
+    db::assign_role(&state.pool, user.id, db::ROLE_VIEWER).await?;
+
+    if is_admin_email(&user.email) {
+        db::assign_role(&state.pool, user.id, db::ROLE_ADMIN).await?;
+    }
+    Ok(())
+}
+
+/// True if `email` is present in the comma-separated `ADMIN_EMAILS` env var
+/// (case-insensitive, trimmed).
+fn is_admin_email(email: &str) -> bool {
+    let Ok(list) = std::env::var("ADMIN_EMAILS") else {
+        return false;
+    };
+    list.split(',')
+        .map(|e| e.trim().to_lowercase())
+        .any(|e| !e.is_empty() && e == email)
 }
 
 /// Destroy the current session and return to the landing page.
@@ -172,14 +202,24 @@ fn verify_password(password: &str, stored_hash: &str) -> bool {
         .is_ok()
 }
 
-/// Persist the logged-in user's id into the session. Cycling the id on login
-/// prevents session fixation.
-async fn start_session(session: &Session, user_id: Uuid) -> Result<(), AuthError> {
+/// Persist the logged-in user's id into the session and cache their resolved
+/// permissions. Cycling the id on login prevents session fixation.
+async fn start_session(
+    state: &AppState,
+    session: &Session,
+    user_id: Uuid,
+) -> Result<(), AuthError> {
     session.cycle_id().await.map_err(AuthError::session)?;
     session
         .insert(USER_ID_KEY, user_id)
         .await
         .map_err(AuthError::session)?;
+
+    // Resolve permissions once, now, and cache them in the session so
+    // request-time authorization checks hit memory, not the database.
+    authz::cache_permissions(session, &state.pool, user_id)
+        .await
+        .map_err(|e| AuthError::session(e))?;
     Ok(())
 }
 
