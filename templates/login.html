@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Log in · railway-derp</title>
+    <style>
+        :root { color-scheme: light dark; --fg:#1a1a1a; --bg:#fafafa; --muted:#6b7280; --accent:#6366f1; --border:#d1d5db; }
+        @media (prefers-color-scheme: dark) { :root { --fg:#e5e7eb; --bg:#0f0f11; --muted:#9ca3af; --border:#374151; } }
+        * { box-sizing: border-box; }
+        body { margin:0; min-height:100vh; display:grid; place-items:center; font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; color:var(--fg); background:var(--bg); }
+        main { width:100%; max-width:22rem; padding:2rem; }
+        h1 { font-size:1.6rem; margin:0 0 1.5rem; letter-spacing:-0.02em; }
+        label { display:block; font-size:0.85rem; color:var(--muted); margin:0 0 0.35rem; }
+        input { width:100%; padding:0.6rem 0.7rem; margin-bottom:1rem; border:1px solid var(--border); border-radius:0.5rem; background:transparent; color:var(--fg); font-size:1rem; }
+        button { width:100%; padding:0.65rem; border:0; border-radius:0.5rem; background:var(--accent); color:#fff; font-size:1rem; font-weight:600; cursor:pointer; }
+        p { color:var(--muted); font-size:0.9rem; margin:1rem 0 0; text-align:center; }
+        a { color:var(--accent); }
+    </style>
+</head>
+<body>
+    <main>
+        <h1>Log in</h1>
+        <form method="post" action="/login">
+            <label for="email">Email</label>
+            <input id="email" name="email" type="email" autocomplete="email" required />
+            <label for="password">Password</label>
+            <input id="password" name="password" type="password" autocomplete="current-password" required />
+            <button type="submit">Log in</button>
+        </form>
+        <p>No account yet? <a href="/signup">Sign up</a></p>
+    </main>
+</body>
+</html>

@@ -5,11 +5,34 @@ edition = "2024"
 rust-version = "1.98"
 
 [dependencies]
-axum = "0.8"
+axum = { version = "0.8", features = ["macros"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal"] }
 tower-http = { version = "0.7", features = ["fs", "trace"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# --- Auth stack ---
+# sqlx: runtime query API only (no "macros"/"migrate") so there is NO
+# compile-time database dependency. tls-rustls keeps the static musl build
+# free of OpenSSL/libc so the scratch Docker image still works.
+sqlx = { version = "0.8", default-features = false, features = [
+    "runtime-tokio",
+    "tls-rustls",
+    "postgres",
+    "uuid",
+    "time",
+] }
+argon2 = "0.5"
+# NOTE: the sqlx store crate lags the main crate by one core version. The
+# latest store (0.15.0) depends on tower-sessions-core 0.14, so the main
+# tower-sessions crate must be pinned to 0.14 (also core 0.14) to share a
+# single core version. Pin exact minors to keep them aligned.
+tower-sessions = "=0.14.0"
+tower-sessions-sqlx-store = { version = "=0.15.0", features = ["postgres"] }
+serde = { version = "1", features = ["derive"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+time = "0.3"
+anyhow = "1"
 
 # Release profile tuned for small binary / low memory footprint.
 [profile.release]

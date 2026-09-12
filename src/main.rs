@@ -3,17 +3,29 @@ use std::net::SocketAddr;
 use axum::{
     http::StatusCode,
     response::Html,
-    routing::get,
+    routing::{get, post},
     Router,
 };
+use sqlx::PgPool;
 use tokio::net::TcpListener;
 use tower_http::trace::TraceLayer;
+use tower_sessions::{cookie::SameSite, Expiry, SessionManagerLayer};
+use tower_sessions_sqlx_store::PostgresStore;
 
-/// Landing page HTML, rendered at compile time from the templates directory.
+mod auth;
+mod db;
+
+/// Shared application state handed to every handler.
+#[derive(Clone)]
+pub struct AppState {
+    pub pool: PgPool,
+}
+
+/// Landing page HTML, embedded at compile time.
 const INDEX_HTML: &str = include_str!("../templates/index.html");
 
 #[tokio::main]
-async fn main() {
+async fn main() -> anyhow::Result<()> {
     // Structured logging. Set RUST_LOG to control verbosity (defaults to info).
     tracing_subscriber::fmt()
         .with_env_filter(
@@ -22,7 +34,34 @@ async fn main() {
         )
         .init();
 
-    let app = build_router();
+    // Railway provides DATABASE_URL when a Postgres service is attached.
+    let database_url = std::env::var("DATABASE_URL")
+        .map_err(|_| anyhow::anyhow!("DATABASE_URL is not set"))?;
+
+    // Connect and provision the schema at runtime (no compile-time DB needed).
+    let pool = db::connect(&database_url).await?;
+    db::init_schema(&pool).await?;
+
+    // Session store, backed by Postgres. `migrate()` creates its table on
+    // startup — same "dynamic" approach as the app schema.
+    let session_store = PostgresStore::new(pool.clone());
+    session_store.migrate().await?;
+
+    // Cookies are Secure (HTTPS-only) by default, which is correct on Railway.
+    // Set COOKIE_SECURE=false for local development over plain HTTP, otherwise
+    // the browser will refuse to store the session cookie.
+    let cookie_secure = std::env::var("COOKIE_SECURE")
+        .map(|v| v != "false" && v != "0")
+        .unwrap_or(true);
+
+    let session_layer = SessionManagerLayer::new(session_store)
+        .with_secure(cookie_secure)
+        .with_http_only(true)
+        .with_same_site(SameSite::Lax)
+        .with_expiry(Expiry::OnInactivity(time::Duration::days(7)));
+
+    let state = AppState { pool };
+    let app = build_router(state, session_layer);
 
     // Railway injects PORT. Fall back to 3000 for local development.
     let port: u16 = std::env::var("PORT")
@@ -30,28 +69,34 @@ async fn main() {
         .and_then(|p| p.parse().ok())
         .unwrap_or(3000);
 
-    // Bind to 0.0.0.0 so the container is reachable from outside.
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
-    let listener = TcpListener::bind(addr)
-        .await
-        .expect("failed to bind to address");
+    let listener = TcpListener::bind(addr).await?;
 
     tracing::info!("listening on http://{addr}");
 
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
-        .await
-        .expect("server error");
+        .await?;
+
+    Ok(())
 }
 
 /// Build the application router.
-///
-/// New routes (e.g. `/login`, `/signup`) get added here as the app grows.
-fn build_router() -> Router {
+fn build_router(
+    state: AppState,
+    session_layer: SessionManagerLayer<PostgresStore>,
+) -> Router {
     Router::new()
         .route("/", get(index))
         .route("/health", get(health))
+        // Auth
+        .route("/signup", get(auth::signup_form).post(auth::signup))
+        .route("/login", get(auth::login_form).post(auth::login))
+        .route("/logout", post(auth::logout))
+        .route("/me", get(auth::me)) // protected: 401 unless logged in
+        .layer(session_layer)
         .layer(TraceLayer::new_for_http())
+        .with_state(state)
 }
 
 /// Serve the landing page.
