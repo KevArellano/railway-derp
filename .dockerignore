@@ -1,0 +1,11 @@
+# Keep the build context small and avoid copying host build artifacts.
+target
+.git
+.gitignore
+.env
+.env.*
+README.md
+railway.json
+*.md
+.vscode
+.idea
